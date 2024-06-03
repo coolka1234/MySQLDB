@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Maj 21, 2024 at 01:57 PM
--- Wersja serwera: 10.4.32-MariaDB
--- Wersja PHP: 8.0.30
+-- Generation Time: Jun 03, 2024 at 06:00 PM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,12 +18,12 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `szkola_copy`
+-- Database: `szkola`
 --
 
 DELIMITER $$
 --
--- Procedury
+-- Procedures
 --
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Liczba dziewcząt i chłopców w klasach` ()   SELECT Klasy.Symbol AS Klasa, 
 IFNULL(SUM(Uczniowie.Plec = 'K'),0) AS `Liczba dziewcząt`, 
@@ -37,9 +37,46 @@ FROM Miasta
 LEFT JOIN Uczniowie ON Miasta.IdM = Uczniowie.Miasto
 GROUP BY Miasta.NazwaM$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `Nauczyciele zatrudnieni od 1 marca 2020` ()   SELECT *
-FROM Nauczyciele
-WHERE DZatr >= '2020-03-01'$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Nauczyciele bez wychowawstwa` ()   SELECT Nauczyciele.Imie, Nauczyciele.Nazwisko, Nauczyciele.IdN, Nauczyciele.DZatr, Nauczyciele.DUr, Nauczyciele.Plec, Nauczyciele.Pensja, Nauczyciele.Pensum, Nauczyciele.Telefon, Nauczyciele.Premia
+FROM Nauczyciele LEFT JOIN Klasy ON Nauczyciele.IdN = Klasy.Wych
+WHERE (((Klasy.Wych) Is Null))$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Nauczyciele powyzej podanego stazu` (IN `Staz` INT)   SELECT 
+    Nauczyciele.Nazwisko, 
+    Nauczyciele.Imie, 
+    Nauczyciele.IdN, 
+    Nauczyciele.DZatr, 
+    Nauczyciele.DUr, 
+    Nauczyciele.Plec, 
+    Nauczyciele.Pensja, 
+    Nauczyciele.Pensum, 
+    Nauczyciele.Telefon, 
+    Nauczyciele.Premia, 
+    YEAR(CURDATE()) - YEAR(Nauczyciele.DZatr) AS Staż
+FROM 
+    Nauczyciele
+WHERE 
+    (YEAR(CURDATE()) - YEAR(Nauczyciele.DZatr)) > CAST((Staz) AS UNSIGNED)$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Nauczyciele zatrudnieni w maju` ()   SELECT 
+    Nauczyciele.Nazwisko, 
+    Nauczyciele.Imie, 
+    Nauczyciele.IdN, 
+    Nauczyciele.DZatr, 
+    Nauczyciele.DUr, 
+    Nauczyciele.Plec, 
+    Nauczyciele.Pensja, 
+    Nauczyciele.Pensum, 
+    Nauczyciele.Telefon, 
+    Nauczyciele.Premia
+FROM 
+    Nauczyciele
+WHERE 
+    MONTH(Nauczyciele.DZatr) = 5$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Nazwy miast w których mieszkają uczniowie` ()   SELECT DISTINCT Miasta.NazwaM
+FROM Miasta
+INNER JOIN Uczniowie ON Miasta.IdM = Uczniowie.Miasto$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Spis nauczycieli i uczniów z symbolem` ()   SELECT Nauczyciele.Nazwisko, Nauczyciele.Imie AS Imię, Nauczyciele.IdN AS Nr, Nauczyciele.DUr AS `Data urodzenia`, 'N' AS Symbol 
 FROM Nauczyciele
@@ -47,6 +84,20 @@ UNION
 SELECT Uczniowie.Nazwisko, Uczniowie.Imie, Uczniowie.IdU, Uczniowie.DUr, 'U' 
 FROM Uczniowie
 ORDER BY `Data urodzenia` DESC, Nazwisko, Imię$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Średnia dla uczniów z ocenami` ()   SELECT 
+    Uczniowie.IdU AS Numer, 
+    Uczniowie.Nazwisko, 
+    Uczniowie.Imie, 
+	CAST(AVG(Oceny.Ocena) AS DECIMAL(3,2)) AS `Średnia ocen`
+FROM 
+    Uczniowie 
+INNER JOIN 
+    Oceny ON Uczniowie.IdU = Oceny.IdU
+GROUP BY 
+    Uczniowie.IdU, 
+    Uczniowie.Nazwisko, 
+    Uczniowie.Imie$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Uczniowie wg ocen malejąco` ()   SELECT Uczniowie.Nazwisko, Uczniowie.Imie, Uczniowie.IdU, Przedmioty.NazwaP, Oceny.Ocena
 FROM (Uczniowie INNER JOIN Oceny ON Uczniowie.IdU = Oceny.IdU) INNER JOIN Przedmioty ON Oceny.IdP = Przedmioty.IdP
@@ -56,23 +107,12 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `Uczniowie z danej klasy` (IN `Klasa
 FROM Miasta INNER JOIN Uczniowie ON Miasta.IdM = Uczniowie.Miasto WHERE
 uczniowie.KlasaU = KlasaU ORDER BY Uczniowie.Nazwisko, Uczniowie.Imie$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `Uczniowie z klas I-III` ()   SELECT Nazwisko, Imie, IdU, KlasaU
-FROM Uczniowie
-WHERE KlasaU LIKE 'I_' OR KlasaU LIKE 'II_' OR KlasaU LIKE 'III_'$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `Uczniowie z klas II z miast na literę C-P` ()   SELECT Uczniowie.Nazwisko, Uczniowie.Imie, Uczniowie.IdU, Uczniowie.DUr, Uczniowie.Plec, Uczniowie.KlasaU, Miasta.NazwaM FROM Miasta INNER JOIN Uczniowie ON Miasta.IdM = Uczniowie.Miasto WHERE Uczniowie.KlasaU LIKE 'II_' AND (LEFT(Miasta.NazwaM, 1) >= 'C' AND LEFT(Miasta.NazwaM, 1) <= 'P') ORDER BY Uczniowie.Nazwisko, Uczniowie.Imie$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `Wychowawcy klas` ()   SELECT Klasy.Symbol, Nauczyciele.Nazwisko, Nauczyciele.Imie, Nauczyciele.IdN, Nauczyciele.DZatr, Nauczyciele.DUr, Nauczyciele.Plec, Nauczyciele.Pensja, Nauczyciele.Pensum, Nauczyciele.Telefon, Nauczyciele.Premia
-FROM Klasy
-LEFT JOIN Nauczyciele ON Nauczyciele.IdN = Klasy.Wych
-ORDER BY Klasy.Symbol$$
-
 DELIMITER ;
 
 -- --------------------------------------------------------
 
 --
--- Struktura tabeli dla tabeli `klasy`
+-- Table structure for table `klasy`
 --
 
 CREATE TABLE `klasy` (
@@ -102,13 +142,13 @@ INSERT INTO `klasy` (`Symbol`, `Profil`, `Wych`) VALUES
 -- --------------------------------------------------------
 
 --
--- Struktura tabeli dla tabeli `miasta`
+-- Table structure for table `miasta`
 --
 
 CREATE TABLE `miasta` (
   `IdM` int(11) UNSIGNED NOT NULL,
   `NazwaM` varchar(30) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_polish_ci;
 
 --
 -- Dumping data for table `miasta`
@@ -134,7 +174,7 @@ INSERT INTO `miasta` (`IdM`, `NazwaM`) VALUES
 -- --------------------------------------------------------
 
 --
--- Struktura tabeli dla tabeli `nauczyciele`
+-- Table structure for table `nauczyciele`
 --
 
 CREATE TABLE `nauczyciele` (
@@ -167,19 +207,19 @@ INSERT INTO `nauczyciele` (`IdN`, `Nazwisko`, `Imie`, `DZatr`, `DUr`, `Plec`, `P
 (10, 'Kulczycki', 'Karol', '2018-04-12', '1997-12-01', 'M', 0.00, 300, '', 0.00),
 (11, 'Oćwieja', 'Maria', '1988-01-12', '1965-07-04', 'K', 7345.00, 270, '092183303', 120.00),
 (12, 'Januszewski', 'Tomasz', '2001-12-12', '1974-01-01', 'M', 5541.00, 90, '', 0.00),
-(13, 'Roman', 'Marcin', '0000-00-00', '1984-08-01', 'M', 896.00, 90, '', 20.00),
+(13, 'Roman', 'Marcin', NULL, '1984-08-01', 'M', 896.00, 90, '', 20.00),
 (14, 'Kraus', 'Mariusz', '2000-05-02', '1971-06-04', 'M', 0.00, 600, '673210992', 400.00),
 (15, 'Sydor', 'Renata', '2005-01-12', '1980-04-01', 'K', 5080.00, 0, '209838383', 23.00),
 (16, 'Letkowska', 'Danuta', '2005-03-03', '1972-01-01', '', 3774.00, 60, '203810238', 10.00),
-(17, 'Letkowska', 'Magdalena', '2008-12-01', '0000-00-00', 'K', 4327.00, 90, '238019923', 100.00),
+(17, 'Letkowska', 'Magdalena', '2008-12-01', NULL, 'K', 4327.00, 90, '238019923', 100.00),
 (18, 'Podolak-Zając', 'Jolanta', '2022-08-26', '2001-06-15', 'K', 4080.00, 120, '338109283', 51.00),
-(19, 'Sergiew', 'Tomasz', '0000-00-00', '1972-01-10', 'M', 65.00, 60, '', 0.00),
+(19, 'Sergiew', 'Tomasz', NULL, '1972-01-10', 'M', 65.00, 60, '', 0.00),
 (20, 'Barć', 'Bartosz', '2003-08-27', '1983-12-13', 'M', 5222.00, 150, '208338098', 320.00);
 
 -- --------------------------------------------------------
 
 --
--- Struktura tabeli dla tabeli `oceny`
+-- Table structure for table `oceny`
 --
 
 CREATE TABLE `oceny` (
@@ -203,7 +243,7 @@ INSERT INTO `oceny` (`IdU`, `IdP`, `Ocena`, `DataO`) VALUES
 (3, 4, 2.0, '2022-06-15'),
 (3, 5, 5.0, '2022-06-11'),
 (3, 6, 3.0, '2023-06-22'),
-(3, 7, 4.0, '0000-00-00'),
+(3, 7, 4.0, NULL),
 (3, 8, 5.0, '2022-06-11'),
 (3, 9, 3.0, '2022-06-22'),
 (3, 10, 3.0, '2022-06-21'),
@@ -213,7 +253,7 @@ INSERT INTO `oceny` (`IdU`, `IdP`, `Ocena`, `DataO`) VALUES
 (4, 4, 5.0, '2023-06-07'),
 (4, 5, 3.0, '2020-05-02'),
 (5, 5, 2.0, '2024-06-08'),
-(5, 7, 3.0, '2019-03-06'),
+(5, 7, 3.0, NULL),
 (6, 1, 5.0, '2024-06-07'),
 (7, 1, 4.0, '2023-06-08'),
 (7, 3, 4.0, '2023-04-06'),
@@ -228,7 +268,7 @@ INSERT INTO `oceny` (`IdU`, `IdP`, `Ocena`, `DataO`) VALUES
 -- --------------------------------------------------------
 
 --
--- Struktura tabeli dla tabeli `przedmioty`
+-- Table structure for table `przedmioty`
 --
 
 CREATE TABLE `przedmioty` (
@@ -256,7 +296,7 @@ INSERT INTO `przedmioty` (`IdP`, `NazwaP`) VALUES
 -- --------------------------------------------------------
 
 --
--- Struktura tabeli dla tabeli `uczniowie`
+-- Table structure for table `uczniowie`
 --
 
 CREATE TABLE `uczniowie` (
@@ -279,7 +319,7 @@ INSERT INTO `uczniowie` (`IdU`, `Nazwisko`, `Imie`, `DUr`, `Plec`, `KlasaU`, `Mi
 (3, 'Kryska', 'Janina', '2004-01-11', 'K', '', 0),
 (4, 'Ożóg', 'Kajetan', '2003-05-08', '', 'Id', 2),
 (5, 'Bator', 'Marcin', '2003-06-12', 'M', 'Id', 0),
-(6, 'Kuliński', 'Oskar', '0000-00-00', 'M', 'IIb', 9),
+(6, 'Kuliński', 'Oskar', NULL, 'M', 'IIb', 9),
 (7, 'Bukowińska', 'Marta', '2002-01-01', 'K', '', 1),
 (8, 'Mędrek', 'Kinga', '2002-03-17', 'K', 'IIa', 10),
 (9, 'TERECH', 'Rafał', '2003-06-18', 'M', 'Ic', 10),
@@ -300,14 +340,14 @@ INSERT INTO `uczniowie` (`IdU`, `Nazwisko`, `Imie`, `DUr`, `Plec`, `KlasaU`, `Mi
 (24, 'BUKSA', 'Adam', '2003-01-01', 'M', 'IIb', 7),
 (25, 'Szymański', 'Sebastian', '2002-04-03', 'M', 'IIb', 10),
 (26, 'Tracik', 'Eryk', '2002-12-04', 'M', 'Ia', 3),
-(27, 'Muszka', 'Przemysław', '0000-00-00', 'M', 'IIc', 5),
+(27, 'Muszka', 'Przemysław', NULL, 'M', 'IIc', 5),
 (28, 'Boczar', 'Patryk', '2003-05-05', '', 'IIb', 2),
 (29, 'Ożóg', 'Lena', '2003-07-05', 'K', 'Ia', 12),
 (30, 'Zalwski', 'Piotr', '2004-08-17', 'M', 'Ia', 8),
 (31, 'MATERNA', 'Magdalena', '2003-08-19', 'K', 'Ib', 3),
 (32, 'MICHALSKA', 'Paulina', '2003-09-06', 'K', 'IIa', 5),
 (33, 'Matuła', 'Wiktoria', '2004-01-04', 'K', 'IIa', 5),
-(34, 'Gołdyn', 'Mikołaj', '0000-00-00', '', '', 0),
+(34, 'Gołdyn', 'Mikołaj', NULL, '', '', 0),
 (35, 'Błazej', 'Weronika', '2003-03-08', 'K', 'Ib', 3),
 (36, 'Walawender', 'Jan', '2003-12-12', '', 'Id', 3),
 (37, 'Paź', 'Jan', '2004-12-27', 'M', 'Id', 7),
@@ -317,8 +357,8 @@ INSERT INTO `uczniowie` (`IdU`, `Nazwisko`, `Imie`, `DUr`, `Plec`, `KlasaU`, `Mi
 (41, 'Traczek', 'Urszula', '2003-09-01', 'K', 'Id', 7),
 (42, 'Sitek', 'Maciej', '2004-12-13', 'M', 'Ic', 0),
 (43, 'Gobol', 'Tomasz', '2003-01-02', 'M', 'Ic', 10),
-(44, 'Kalasz', 'Iwo', '0000-00-00', '', '', 0),
-(45, 'Kowal', 'Henryk', '0000-00-00', 'M', 'IIb', 9),
+(44, 'Kalasz', 'Iwo', NULL, '', '', 0),
+(45, 'Kowal', 'Henryk', NULL, 'M', 'IIb', 9),
 (46, 'Czyż', 'Ewa', '2003-11-06', 'K', 'IIb', 7),
 (47, 'Kawaś', 'Mikołaj', '2001-06-01', 'M', 'IIa', 18),
 (48, 'Krysz', 'Grzegorz', '2003-02-02', 'M', 'IIIa', 4),
@@ -339,7 +379,7 @@ INSERT INTO `uczniowie` (`IdU`, `Nazwisko`, `Imie`, `DUr`, `Plec`, `KlasaU`, `Mi
 -- --------------------------------------------------------
 
 --
--- Struktura tabeli dla tabeli `uczy`
+-- Table structure for table `uczy`
 --
 
 CREATE TABLE `uczy` (
@@ -391,47 +431,47 @@ INSERT INTO `uczy` (`IdN`, `IdP`, `IleGodz`) VALUES
 (19, 3, 25);
 
 --
--- Indeksy dla zrzutów tabel
+-- Indexes for dumped tables
 --
 
 --
--- Indeksy dla tabeli `klasy`
+-- Indexes for table `klasy`
 --
 ALTER TABLE `klasy`
   ADD PRIMARY KEY (`Symbol`);
 
 --
--- Indeksy dla tabeli `miasta`
+-- Indexes for table `miasta`
 --
 ALTER TABLE `miasta`
   ADD PRIMARY KEY (`IdM`);
 
 --
--- Indeksy dla tabeli `nauczyciele`
+-- Indexes for table `nauczyciele`
 --
 ALTER TABLE `nauczyciele`
   ADD PRIMARY KEY (`IdN`);
 
 --
--- Indeksy dla tabeli `oceny`
+-- Indexes for table `oceny`
 --
 ALTER TABLE `oceny`
   ADD PRIMARY KEY (`IdU`,`IdP`);
 
 --
--- Indeksy dla tabeli `przedmioty`
+-- Indexes for table `przedmioty`
 --
 ALTER TABLE `przedmioty`
   ADD PRIMARY KEY (`IdP`);
 
 --
--- Indeksy dla tabeli `uczniowie`
+-- Indexes for table `uczniowie`
 --
 ALTER TABLE `uczniowie`
   ADD PRIMARY KEY (`IdU`);
 
 --
--- Indeksy dla tabeli `uczy`
+-- Indexes for table `uczy`
 --
 ALTER TABLE `uczy`
   ADD PRIMARY KEY (`IdN`,`IdP`);
